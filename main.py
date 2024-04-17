@@ -1,36 +1,44 @@
+import json
+import ephem
 import requests
-import matplotlib
+import yaml
+from matplotlib import pyplot as plt
 
 from http.client import responses as response_codes
 from typing import List, Dict, Any
-from requests import Response, session
+from requests import Response
 from requests.auth import HTTPBasicAuth
 
-auth_url: str = 'https://www.space-track.org/ajaxauth/login'
+uriBase = "https://www.space-track.org"
+requestLogin = "/ajaxauth/login"
+requestCmdAction = "/basicspacedata/query"
+requestGEO = "/class/gp_history/NORAD_CAT_ID/25544/orderby/NORAD_CAT_ID/limit/200/format/json"
+requestFindStarlinks = "/class/tle_latest/NORAD_CAT_ID/>40000/ORDINAL/1/OBJECT_NAME/STARLINK~~/format/json/orderby/NORAD_CAT_ID%20asc"
+requestOMMStarlink1 = "/class/omm/NORAD_CAT_ID/"
+requestOMMStarlink2 = "/orderby/EPOCH%20asc/format/json"
 
-good_url: str = 'https://www.space-track.org/basicspacedata/query/class/satcat/\
-PERIOD/1430--1450/CURRENT/Y/DECAY/null-val/orderby/NORAD_CAT_ID/format/json'
+m_data: Dict = {}
 
-test_url: str = 'https://www.space-track.org/basicspacedata/query/class/gp/\
-NORAD_CAT_ID/36000,36001--36004, ~~36005,^3600,36010/orderby/NORAD_CAT_ID/format/json'
+""" Retrieving Login Information """
+with open('secret.json') as file:
+    login_dict = json.load(file)
 
-# Retrieving Login Information
-raw_dict: Dict[str, str] = {}
-with open('secret.txt', mode='r') as file:
-    for line in file:
-        name, val = line.partition('=')[::2]
-        raw_dict[name] = val
-
-username = raw_dict['username']
-password = raw_dict['password']
-login_dict: Dict[str, str] = {'identity': username, 'password': password}
-
-# Opening Session, Logging in, querying data, closing session
+""" Opening Session, Logging in, querying data, closing session """
 with requests.Session() as session:
-    login_response = session.post(url=auth_url, data=login_dict)
-    print(f'Login Response: {login_response.status_code} ({response_codes[login_response.status_code]})')
+    # Logging in...
+    login_response: Response = session.post(uriBase + requestLogin, data=login_dict)
 
-    data_response: Response = session.get(url=test_url)
-    print(data_response.text)
+    if login_response.status_code != 200:
+        raise Exception(login_response, "POST fail on login")
 
-    session.close()
+    # Querying Data...
+    # starlink_response = session.get(uriBase + requestCmdAction + requestFindStarlinks)
+    # print(f'Starlink Response:\n {starlink_response.text}')
+    data_response: Response = session.get(f'{uriBase}{requestCmdAction}{requestGEO}')
+    m_data.update(json.loads(data_response.text))
+    print(m_data)
+
+    if login_response.status_code != 200:
+        raise Exception(data_response, "GET fail on data retrieval")
+
+""" Calculating """
